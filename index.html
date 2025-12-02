@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agro-Chem Admin Dashboard V-Final</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
+    <style>
+        /* ****************** GLOBAL/LAYOUT STYLES ****************** */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #333; margin: 0; background-color: #f0f4f7;
+            display: flex; min-height: 100vh;
+        }
+
+        /* LOGIN PAGE */
+        .login-page {
+            background-image: linear-gradient(135deg, #1e5a2c 0%, #387c38 100%); 
+            display: flex; justify-content: center; align-items: center; min-height: 100vh;
+            width: 100%; position: fixed; top: 0; left: 0; z-index: 10;
+        }
+        .login-container {
+            background-color: #ffffff; padding: 30px 40px; border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3); width: 100%; max-width: 400px; text-align: center;
+        }
+        .input-group { text-align: left; margin-bottom: 15px; }
+        .input-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
+        .input-group input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        .submit-btn {
+            width: 100%; padding: 14px; font-size: 18px; margin-top: 18px;
+            background-color: #1e5a2c; color: white; border: none; border-radius: 8px; cursor: pointer; transition: background-color 0.3s;
+        }
+        .submit-btn:hover { background-color: #387c38; }
+        .error { color: #f44336; }
+
+        /* DASHBOARD LAYOUT */
+        .admin-dashboard-page { display: none; width: 100%; min-height: 100vh; background-color: #f0f4f7; }
+        .sidebar {
+            width: 250px; background-color: #2c3e50; color: white; padding-top: 20px;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1); position: sticky; top: 0; height: 100vh; overflow-y: auto;
+        }
+        .logo { text-align: center; padding: 10px 0 30px 0; font-size: 20px; font-weight: 700; color: #f4d03f; }
+        .nav-link {
+            display: flex; align-items: center; padding: 15px 20px; color: #bdc3c7; text-decoration: none;
+            font-size: 15px; transition: background-color 0.3s, color 0.3s; cursor: pointer;
+        }
+        .nav-link:hover { background-color: #34495e; color: white; }
+        .nav-link.active {
+            background-color: #1abc9c; color: white; font-weight: bold; border-left: 5px solid #2ecc71;
+        }
+        .logout-link { margin-top: 30px; background-color: #e74c3c; border-left: none !important; }
+        .main-content { flex-grow: 1; padding: 30px; }
+        .content-header { margin-bottom: 30px; padding-bottom: 15px; border-bottom: 2px solid #ddd; }
+        .content-header h2 { margin: 0; color: #2c3e50; font-size: 30px; }
+        .admin-page-content { display: none; padding: 20px 0; }
+        .admin-page-content.active { display: block; }
+        
+        /* DATA LISTS */
+        .data-list {
+            margin-top: 15px; background-color: white; padding: 20px;
+            border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+        }
+        .data-item {
+            display: flex; justify-content: space-between; align-items: center; padding: 15px;
+            margin-bottom: 10px; border: 1px solid #eee; border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03); transition: transform 0.2s;
+        }
+        .data-item:hover { transform: translateY(-2px); }
+        .data-info { flex-grow: 1; padding-right: 20px; }
+        .data-info p { margin: 3px 0; font-size: 14px; }
+        .data-actions { display: flex; gap: 10px; }
+        .data-actions button {
+            padding: 8px 12px; border: none; border-radius: 5px; cursor: pointer;
+            font-weight: bold; transition: background-color 0.3s; font-size: 13px;
+        }
+        .approve-btn { background-color: #2ecc71; color: white; }
+        .reject-btn { background-color: #e74c3c; color: white; }
+        .view-edit-btn { background-color: #2980b9; color: white; }
+        .delete-btn { background-color: #f39c12; color: white; }
+        .restore-btn { background-color: #1abc9c; color: white; }
+        .balance-info { font-weight: bold; color: #2980b9; }
+
+        /* MODAL STYLES */
+        .modal {
+            display: none; position: fixed; z-index: 20; left: 0; top: 0; width: 100%; height: 100%; 
+            overflow: auto; background-color: rgba(0,0,0,0.6); 
+        }
+        .modal-content {
+            background-color: #fefefe; margin: 5% auto; padding: 30px; border-radius: 10px;
+            width: 80%; max-width: 600px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); animation: fadeIn 0.3s;
+        }
+        .close-btn { color: #aaa; float: right; font-size: 28px; font-weight: bold; }
+        .close-btn:hover, .close-btn:focus { color: #000; text-decoration: none; cursor: pointer; }
+        .modal-content h3 { color: #2980b9; border-bottom: 2px solid #ddd; padding-bottom: 10px; margin-top: 0; }
+        .modal-content .input-group input, .modal-content .input-group textarea {
+            border: 1px solid #ccc; padding: 8px; border-radius: 4px; width: 100%; box-sizing: border-box; margin-top: 5px;
+        }
+        .modal-save-btn {
+            background-color: #2ecc71; color: white; padding: 10px 20px; border: none; border-radius: 5px;
+            margin-top: 20px; cursor: pointer; font-weight: bold;
+        }
+        .modal-save-btn:hover { background-color: #27ae60; }
+    </style>
+
+</head>
+<body>
+
+    <div id="login-area" class="login-page">
+        <div class="login-container">
+            <h1>Admin Panel Login</h1>
+            <p style="color: #666; margin-top: -10px;">የኢንቨስተሮች መቆጣጠሪያ ፓነል</p>
+
+            <form id="login-form">
+                <div class="input-group">
+                    <label for="login-identifier">Admin ID:</label>
+                    <input type="text" id="login-identifier" required value="admin123">
+                </div>
+                <div class="input-group">
+                    <label for="login-password">Password:</label>
+                    <input type="password" id="login-password" required value="adminpass">
+                </div>
+                <button type="submit" class="submit-btn">🔐 Admin Login</button>
+                <p class="message" id="login-message"></p>
+            </form>
+        </div>
+    </div>
+    
+    <div id="admin-dashboard-area" class="admin-dashboard-page">
+
+        <div class="sidebar">
+            <div class="logo">AGRO ADMIN V-FINAL</div>
+            <div class="nav-divider"></div>
+
+            <a class="nav-link active" id="nav-deposits" data-page="deposits">💰 Deposit Confirmations</a>
+            <a class="nav-link" id="nav-withdrawals" data-page="withdrawals">💸 Withdraw Confirmations</a>
+            <a class="nav-link" id="nav-transaction-history" data-page="transaction-history">📄 Confirmed Transaction History</a>
+            
+            <div class="nav-divider"></div>
+            
+            <a class="nav-link" id="nav-users" data-page="users">👥 All Active Users</a>
+            <a class="nav-link" id="nav-trash" data-page="trash">🗑️ Trash (Deleted Users)</a>
+            
+            <div class="nav-divider"></div>
+
+            <a class="nav-link" id="nav-active-investments" data-page="active-investments">📊 Active Investments</a>
+            <a class="nav-link" id="nav-investment-control" data-page="investment-control">📈 Investment Control</a>
+
+            <a class="nav-link logout-link" id="admin-logout-btn">🚪 Logout</a>
+        </div>
+
+        <div class="main-content">
+            <div class="content-header">
+                <h2 id="current-page-title">💰 Deposit Confirmations</h2>
+                <p style="margin-top: 5px; color: #555;">መረጃውን በጥንቃቄ ያስተዳድሩ።</p>
+            </div>
+
+            <div id="content-deposits" class="admin-page-content active">
+                <h3 style="color: #2ecc71;">Pending Deposit Requests (የማስገባት ጥያቄዎች)</h3>
+                <div class="data-list" id="pending-deposits-list">
+                    <p style="text-align: center; color: #555;">Loading...</p>
+                </div>
+            </div>
+
+            <div id="content-withdrawals" class="admin-page-content">
+                <h3 style="color: #e74c3c;">Pending Withdrawal Requests (የማውጣት ጥያቄዎች)</h3>
+                <div class="data-list" id="pending-withdrawals-list">
+                    <p style="text-align: center; color: #555;">Loading...</p>
+                </div>
+            </div>
+            
+            <div id="content-transaction-history" class="admin-page-content">
+                <h3 style="color: #2980b9;">Confirmed Transaction History (የተረጋገጡ ግብይቶች ታሪክ)</h3>
+                <div class="data-list" id="all-confirmed-transactions-list">
+                    <p style="text-align: center; color: #555;">Loading...</p>
+                </div>
+            </div>
+
+            <div id="content-users" class="admin-page-content">
+                <h3 style="color: #2980b9;">All Active Users (ሁሉም ንቁ ተጠቃሚዎች)</h3>
+                <div class="input-group" style="margin-bottom: 20px;">
+                    <label for="user-search-input">በስልክ ቁጥር (ID) ይፈልጉ:</label>
+                    <input type="text" id="user-search-input" placeholder="የሙሉ ወይም ከፊል ስልክ ቁጥር ያስገቡ..." style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc;">
+                </div>
+                <div class="data-list" id="all-active-users-list">
+                    <p style="text-align: center; color: #555;">Loading...</p>
+                </div>
+            </div>
+            
+            <div id="content-trash" class="admin-page-content">
+                <h3 style="color: #f39c12;">Deleted Users (የተሰረዙ ተጠቃሚዎች)</h3>
+                <div class="data-list" id="deleted-users-list">
+                    <p style="text-align: center; color: #555;">Loading...</p>
+                </div>
+            </div>
+
+            <div id="content-active-investments" class="admin-page-content">
+                <h3 style="color: #1abc9c;">Active Investments (ንቁ ኢንቨስትመንቶች)</h3>
+                <div class="data-list" id="active-investments-list">
+                    <p style="text-align: center; color: #555;">Loading...</p>
+                </div>
+            </div>
+            
+            <div id="content-investment-control" class="admin-page-content">
+                <h3 style="color: #8e44ad;">All Investments History (የሁሉም ኢንቨስትመንት ታሪክ)</h3>
+                <div class="data-list" id="all-investments-history">
+                    <p style="text-align: center; color: #555;">Loading...</p>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+    
+    <div id="user-detail-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h3>👁️ User Details & Edit (<span id="modal-user-name"></span>)</h3>
+            <form id="user-edit-form">
+                <input type="hidden" id="modal-user-id">
+                
+                <h4 style="color: #2c3e50; margin-top: 0; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Editable Fields</h4>
+
+                <div class="input-group">
+                    <label for="modal-name">ስም (Name):</label>
+                    <input type="text" id="modal-name" required>
+                </div>
+                
+                <div class="input-group">
+                    <label for="modal-balance">ቀሪ ሂሳብ (Balance):</label>
+                    <input type="number" step="0.01" id="modal-balance" required>
+                </div>
+                
+                <h4 style="color: #2980b9; margin-top: 20px; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Historical Data (Read-Only)</h4>
+
+                <div class="input-group">
+                    <label for="modal-identifier">ስልክ ቁጥር (Identifier/ID):</label>
+                    <input type="text" id="modal-identifier" required readonly style="background-color: #eee;">
+                </div>
+                <div class="input-group">
+                    <label for="modal-reg-date">የምዝገባ ቀን (Registration Date):</label>
+                    <input type="text" id="modal-reg-date" readonly style="background-color: #eee;">
+                </div>
+
+                <div class="history-section" style="margin-top: 20px;">
+                    <h4 style="color: #2ecc71;">Recent Transactions (ግብይቶች)</h4>
+                    <div id="modal-transactions-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; border-radius: 5px; font-size: 13px; background-color: #f9f9f9;">Loading...</div>
+                </div>
+
+                <div class="history-section" style="margin-top: 20px;">
+                    <h4 style="color: #f39c12;">Investment History (ኢንቨስትመንቶች)</h4>
+                    <div id="modal-investments-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; border-radius: 5px; font-size: 13px; background-color: #f9f9f9;">Loading...</div>
+                </div>
+                
+                <div class="input-group" style="margin-top: 20px;">
+                    <label for="modal-password-note">Other Info:</label>
+                    <textarea id="modal-password-note" placeholder="Password is encrypted. You cannot see or change it here." readonly style="background-color: #eee;"></textarea>
+                </div>
+                
+                <button type="submit" class="modal-save-btn">💾 Save Changes (ለውጦችን አስቀምጥ)</button>
+            </form>
+            <p class="message" id="modal-message" style="margin-top: 15px;"></p>
+        </div>
+    </div>
+
+
+    <script>
+        // ********** 1. FIREBASE CONFIGURATION **********
+        const firebaseConfig = {
+            apiKey: "AIzaSyDu7AqPVMcvSR-hA6VO7zfVCd9XhJvQFcs",
+            authDomain: "mmmm-c2cc3.firebaseapp.com",
+            databaseURL: "https://mmmm-c2cc3-default-rtdb.firebaseio.com",
+            projectId: "mmmm-c2cc3",
+            storageBucket: "mmmm-c2cc3.firebasestorage.app",
+            messagingSenderId: "1064370711409",
+            appId: "1:1064370711409:web:05787d6231bc721c6aa4d0"
+        };
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+
+        const database = firebase.database();
+        const usersRef = database.ref('users');
+
+        // ********** 2. GLOBAL STATE & CONFIG **********
+        let isAdmin = false; 
+        const ADMIN_ID = 'admin123'; 
+        const ADMIN_PASS = 'adminpass'; 
+        
+        // ********** 3. DOM ELEMENTS **********
+        const loginArea = document.getElementById('login-area');
+        const loginForm = document.getElementById('login-form');
+        const loginMessage = document.getElementById('login-message');
+        const adminDashboardArea = document.getElementById('admin-dashboard-area');
+        const adminLogoutBtn = document.getElementById('admin-logout-btn');
+        const allNavLinks = document.querySelectorAll('.nav-link');
+        const currentPageTitle = document.getElementById('current-page-title');
+
+        const pendingDepositsList = document.getElementById('pending-deposits-list');
+        const pendingWithdrawalsList = document.getElementById('pending-withdrawals-list');
+        const allConfirmedTransactionsList = document.getElementById('all-confirmed-transactions-list'); 
+
+        const allActiveUsersList = document.getElementById('all-active-users-list');
+        const deletedUsersList = document.getElementById('deleted-users-list');
+        const activeInvestmentsList = document.getElementById('active-investments-list');
+        const allInvestmentsHistory = document.getElementById('all-investments-history');
+        
+        const userDetailModal = document.getElementById('user-detail-modal');
+        const modalCloseBtn = userDetailModal.querySelector('.close-btn');
+        const userEditForm = document.getElementById('user-edit-form');
+        const modalMessage = document.getElementById('modal-message');
+        
+        // NEW: Search Input
+        const userSearchInput = document.getElementById('user-search-input');
+
+
+        const PAGE_TITLES = {
+            'deposits': '💰 Deposit Confirmations',
+            'withdrawals': '💸 Withdraw Confirmations',
+            'transaction-history': '📄 Confirmed Transaction History (Deposit & Withdraw Only)',
+            'users': '👥 All Active Users Management',
+            'trash': '🗑️ Trash (Deleted Users)',
+            'active-investments': '📊 Active Investments',
+            'investment-control': '📈 Investment Control (All History)'
+        };
+
+        // ********** 4. FIREBASE UTILITIES **********
+        async function getUserData(identifier) {
+            try {
+                const snapshot = await usersRef.child(identifier).once('value');
+                return snapshot.val();
+            } catch (error) {
+                console.error("Error fetching user data:", error);
+                return null;
+            }
+        }
+
+        async function updateUserData(identifier, data) {
+            try {
+                await usersRef.child(identifier).update(data);
+                return true;
+            } catch (error) {
+                console.error("Error updating user data:", error);
+                return false;
+            }
+        }
+
+        async function getAllUsersData() {
+            try {
+                const snapshot = await usersRef.once('value');
+                return snapshot.val() || {};
+            } catch (error) {
+                console.error("Error fetching all users data:", error);
+                return {};
+            }
+        }
+
+        // ********** 5. CORE ADMIN LOGIC - PAGE SWITCHING **********
+        
+        function switchAdminPage(pageId) {
+            document.querySelectorAll('.admin-page-content').forEach(content => content.classList.remove('active'));
+            document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+
+            const targetContent = document.getElementById(`content-${pageId}`);
+            const targetNav = document.getElementById(`nav-${pageId}`);
+            
+            if (targetContent) targetContent.classList.add('active');
+            if (targetNav) targetNav.classList.add('active');
+            currentPageTitle.textContent = PAGE_TITLES[pageId] || 'Admin Dashboard';
+            
+            // Clear search input if we are not staying on the users page
+            if (pageId !== 'users' && userSearchInput) {
+                userSearchInput.value = '';
+            }
+
+
+            if (pageId === 'deposits') displayPendingDeposits();
+            else if (pageId === 'withdrawals') displayPendingWithdrawals();
+            else if (pageId === 'transaction-history') displayTransactionHistory(); 
+            else if (pageId === 'users') displayAllUsers('active'); 
+            else if (pageId === 'trash') displayAllUsers('deleted');
+            else if (pageId === 'active-investments') displayInvestments(true); 
+            else if (pageId === 'investment-control') displayInvestments(false); 
+        }
+
+        // ********** 6. TRANSACTION MANAGEMENT **********
+
+        async function displayPendingDeposits() {
+            pendingDepositsList.innerHTML = '<p style="text-align: center; color: #555;">Loading...</p>';
+            await displayPendingTransactions('Deposit', pendingDepositsList);
+        }
+
+        async function displayPendingWithdrawals() {
+            pendingWithdrawalsList.innerHTML = '<p style="text-align: center; color: #555;">Loading...</p>';
+            await displayPendingTransactions('Withdraw', pendingWithdrawalsList);
+        }
+        
+        async function displayPendingTransactions(type, listElement) {
+            const allUsers = await getAllUsersData();
+            let pendingTxsHtml = '';
+            let pendingTxsCount = 0;
+            const borderStyle = type === 'Deposit' ? '#2ecc71' : '#e74c3c';
+
+            Object.keys(allUsers).forEach(userId => {
+                const user = allUsers[userId];
+                let transactionsArray = Array.isArray(user.transactions) ? user.transactions : (user.transactions ? Object.values(user.transactions) : []);
+
+                transactionsArray.forEach(tx => {
+                    if (tx.status === 'Pending' && tx.type === type) {
+                        pendingTxsCount++;
+                        
+                        const info = type === 'Deposit' 
+                            ? `Transaction ID: ${tx.id ? tx.id.split('_')[2] : 'N/A'} | Deposit Reference: ${tx.transactionId}` 
+                            : `Bank: ${tx.bankName} | Account: ${tx.accountNumber} | Name: ${tx.fullName}`;
+                        
+                        const formattedAmount = tx.amount ? tx.amount.toFixed(2) : 'N/A';
+
+                        pendingTxsHtml += `
+                        <div class="data-item" style="border-left: 5px solid ${borderStyle};">
+                            <div class="data-info">
+                                <p><strong>ተጠቃሚ:</strong> ${user.name} (${userId})</p>
+                                <p><strong>ዓይነት:</strong> ${tx.type} | <strong>መጠን:</strong> ${formattedAmount} ETB</p>
+                                <p><strong>ቀን:</strong> ${tx.date || 'N/A'}</p>
+                                <p><strong>ዝርዝር:</strong> ${info}</p>
+                            </div>
+                            <div class="data-actions">
+                                <button class="approve-btn" data-tx-id="${tx.id}" data-user-id="${userId}" data-type="${tx.type}" data-amount="${tx.amount}" data-user-name="${user.name}">✅ Approve</button>
+                                <button class="reject-btn" data-tx-id="${tx.id}" data-user-id="${userId}" data-type="${tx.type}" data-amount="${tx.amount}" data-user-name="${user.name}">❌ Reject</button>
+                            </div>
+                        </div>
+                        `;
+                    }
+                });
+            });
+
+            if (pendingTxsCount === 0) {
+                listElement.innerHTML = `<p style="text-align: center; color: #2ecc71; font-weight: bold;">✅ ምንም ያልተረጋገጠ የ${type} ጥያቄ የለም።</p>`;
+            } else {
+                listElement.innerHTML = pendingTxsHtml;
+                listElement.querySelectorAll('.approve-btn, .reject-btn').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const txId = this.getAttribute('data-tx-id');
+                        const userId = this.getAttribute('data-user-id');
+                        const txType = this.getAttribute('data-type');
+                        const txAmount = parseFloat(this.getAttribute('data-amount'));
+                        const userName = this.getAttribute('data-user-name');
+                        const status = this.classList.contains('approve-btn') ? 'Completed' : 'Rejected';
+                        handleTransactionApproval(userId, txId, txType, txAmount, status, userName, type === 'Deposit' ? displayPendingDeposits : displayPendingWithdrawals);
+                    });
+                });
+            }
+        }
+
+        async function handleTransactionApproval(userId, txId, txType, txAmount, status, userName, refreshFunction) {
+            const user = await getUserData(userId);
+            if (!user) { alert("⚠️ ተጠቃሚው አልተገኘም።"); return; }
+
+            let transactionsArray = Array.isArray(user.transactions) ? user.transactions : (user.transactions ? Object.values(user.transactions) : []);
+            
+            // Find the transaction that is currently 'Pending'
+            const txIndex = transactionsArray.findIndex(tx => tx.id === txId && tx.status === 'Pending' && tx.type === txType);
+
+            if (txIndex === -1) { alert("⚠️ ይህ የዝውውር ጥያቄ ቀድሞ ተረጋግጧል ወይም አልተገኘም።"); if(refreshFunction) refreshFunction(); return; }
+
+            const transaction = transactionsArray[txIndex];
+            transaction.status = status;
+
+            let message = '';
+            
+            if (status === 'Completed') {
+                if (txType === 'Deposit') {
+                    // ADD the deposit amount to the user's balance
+                    user.balance = (user.balance || 0) + txAmount;
+                    message = `✅ የ ${txAmount.toFixed(2)} ETB ገንዘብ ማስገባት ለተጠቃሚ ${userName} ተረጋግጧል።`;
+                } else if (txType === 'Withdraw') {
+                    // Balance update was done by the user when requesting withdrawal. No change needed here.
+                    message = `✅ የ ${txAmount.toFixed(2)} ETB ገንዘብ ማውጣት ለተጠቃሚ ${userName} ተረጋግጧል።`;
+                }
+            } else if (status === 'Rejected') {
+                if (txType === 'Withdraw') {
+                    // Return the withdrawn amount to the user's balance because it was deducted when they requested.
+                    user.balance = (user.balance || 0) + txAmount;
+                    message = `✅ የ ${txAmount.toFixed(2)} ETB ገንዘብ ማውጣት ጥያቄ ተሽሯል። ገንዘቡ ወደ ቀሪ ሂሳባቸው ተመልሷል።`;
+                } else if (txType === 'Deposit') {
+                    // No balance change needed for rejected deposit since it was never added to the balance.
+                    message = `✅ የ ${txAmount.toFixed(2)} ETB ገንዘብ ማስገባት ጥያቄ ተሽሯል።`;
+                }
+            }
+
+            transactionsArray[txIndex] = transaction; 
+            await updateUserData(userId, { balance: user.balance, transactions: transactionsArray });
+            
+            alert(message);
+            if(refreshFunction) refreshFunction();
+        }
+
+        // ********** 6.1 CONFIRMED TRANSACTION HISTORY **********
+        async function displayTransactionHistory() {
+            const listElement = allConfirmedTransactionsList;
+            listElement.innerHTML = '<p style="text-align: center; color: #555;">Loading...</p>';
+            
+            try {
+                const allUsers = await getAllUsersData();
+                let confirmedTxsHtml = '';
+                let confirmedTxsCount = 0;
+                const confirmedTransactions = [];
+
+                Object.keys(allUsers).forEach(userId => {
+                    const user = allUsers[userId];
+                    let transactionsArray = Array.isArray(user.transactions) ? user.transactions : (user.transactions ? Object.values(user.transactions) : []);
+
+                    transactionsArray.forEach(tx => {
+                        // FILTERING: Only include Completed/Rejected AND explicitly Deposit or Withdraw
+                        if (tx.status !== 'Pending' && (tx.type === 'Deposit' || tx.type === 'Withdraw')) { 
+                            confirmedTransactions.push({ ...tx, userName: user.name, userId: userId });
+                        }
+                    });
+                });
+                
+                // Sort by date (newest first)
+                confirmedTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                confirmedTransactions.forEach(tx => {
+                    confirmedTxsCount++;
+                    const statusColor = tx.status === 'Completed' ? '#2ecc71' : '#e74c3c';
+                    const statusIcon = tx.status === 'Completed' ? '✅' : '❌';
+                    const typeColor = tx.type === 'Deposit' ? '#3498db' : '#f39c12';
+                    
+                    const info = tx.type === 'Deposit' 
+                        ? `Transaction ID: ${tx.id ? tx.id.split('_')[2] : 'N/A'} | Ref: ${tx.transactionId || 'N/A'}` 
+                        : `Bank: ${tx.bankName || 'N/A'} | Account: ${tx.accountNumber || 'N/A'}`;
+                    
+                    const formattedAmount = tx.amount ? tx.amount.toFixed(2) : 'N/A';
+                    
+                    confirmedTxsHtml += `
+                    <div class="data-item" style="border-left: 5px solid ${statusColor};">
+                        <div class="data-info">
+                            <p><strong>ተጠቃሚ:</strong> ${tx.userName} (${tx.userId})</p>
+                            <p><strong>ዓይነት:</strong> <span style="color: ${typeColor}; font-weight: bold;">${tx.type}</span> | <strong>መጠን:</strong> ${formattedAmount} ETB</p>
+                            <p><strong>ሁኔታ:</strong> <span style="color: ${statusColor}; font-weight: bold;">${statusIcon} ${tx.status}</span> | <strong>ቀን:</strong> ${tx.date || 'N/A'}</p>
+                            <p><strong>ዝርዝር:</strong> ${info}</p>
+                        </div>
+                        <div class="data-actions">
+                            <button class="view-edit-btn" style="background-color: #8e44ad;" data-user-id="${tx.userId}">👤 View User</button>
+                        </div>
+                    </div>
+                    `;
+                });
+
+
+                if (confirmedTxsCount === 0) {
+                    listElement.innerHTML = `<p style="text-align: center; color: #555; font-weight: bold;">ምንም የተረጋገጠ (Completed/Rejected) ግብይት አልተመዘገበም።</p>`;
+                } else {
+                    listElement.innerHTML = confirmedTxsHtml;
+                    listElement.querySelectorAll('.view-edit-btn').forEach(button => {
+                        button.addEventListener('click', () => viewUserDetails(button.getAttribute('data-user-id')));
+                    });
+                }
+
+            } catch (error) {
+                console.error("Error displaying confirmed transactions:", error);
+                listElement.innerHTML = '<p style="text-align: center; color: #f44336;">⚠️ የተረጋገጡ ግብይቶችን ለመጫን አልተቻለም።</p>';
+            }
+        }
+        // *******************************************************************
+
+
+        // ********** 7. USER MANAGEMENT (All Users & Trash) **********
+
+        async function displayAllUsers(statusFilter, searchTerm = '') {
+            const listElement = statusFilter === 'active' ? allActiveUsersList : deletedUsersList;
+            listElement.innerHTML = '<p style="text-align: center; color: #555;">Loading...</p>';
+            
+            try {
+                const allUsers = await getAllUsersData();
+                let usersHtml = '';
+                
+                // 1. Filter by status
+                const usersArray = Object.values(allUsers).filter(user => 
+                    (user.status || 'active') === statusFilter 
+                );
+                
+                // 2. Filter by search term (Identifier/Phone Number)
+                const filteredUsers = usersArray.filter(user => {
+                    if (!searchTerm) return true; // Show all if no search term
+                    const lowerCaseSearch = searchTerm.toLowerCase();
+                    // Search by identifier/phone number (ID)
+                    return (user.identifier || '').toLowerCase().includes(lowerCaseSearch); 
+                });
+
+
+                if (filteredUsers.length === 0) {
+                    listElement.innerHTML = `<p style="text-align: center; color: #555; font-weight: bold;">${searchTerm ? `"${searchTerm}" በሚለው ID የተመዘገበ ${statusFilter === 'active' ? 'ንቁ' : 'የተሰረዘ'} ተጠቃሚ አልተገኘም።` : `ምንም ${statusFilter === 'active' ? 'ንቁ' : 'የተሰረዘ'} ተጠቃሚ የለም።`}</p>`;
+                    return;
+                }
+
+                filteredUsers.forEach(user => {
+                    const balance = (user.balance || 0).toFixed(2);
+                    const investmentCount = Array.isArray(user.investments) ? user.investments.filter(inv => (inv.daysLeft || 0) > 0).length : 0;
+                    const investmentStatus = investmentCount > 0 
+                        ? `<span style="color: #27ae60; font-weight: bold;">Active (${investmentCount} Invests)</span>`
+                        : `<span style="color: #e74c3c; font-weight: bold;">No Active Invest</span>`;
+
+                    let actionButtons = '';
+                    if (statusFilter === 'active') {
+                        actionButtons = `
+                            <button class="view-edit-btn" data-user-id="${user.identifier}">👁️ View/Edit</button>
+                            <button class="reject-btn delete-btn" data-user-id="${user.identifier}" data-action="delete" title="ይህን ሲጫኑ ተጠቃሚው ወደ ቆሻሻ ገጽ ይሄዳል">🗑️ Delete</button>
+                        `;
+                    } else if (statusFilter === 'deleted') {
+                        actionButtons = `
+                            <button class="approve-btn restore-btn" data-user-id="${user.identifier}" data-action="restore">↩️ Restore</button>
+                        `;
+                    }
+
+                    usersHtml += `
+                    <div class="data-item" style="border-left: 5px solid ${statusFilter === 'active' ? '#2980b9' : '#f39c12'};">
+                        <div class="data-info">
+                            <p><strong>ስም:</strong> ${user.name}</p>
+                            <p><strong>ስልክ ቁጥር (ID):</strong> ${user.identifier}</p>
+                            <p><strong>ቀሪ ሂሳብ:</strong> <span class="balance-info">${balance} ETB</span></p>
+                            ${statusFilter === 'active' ? `<p><strong>ኢንቨስትመንት ሁኔታ:</strong> ${investmentStatus}</p>` : `<p><strong>ሁኔታ:</strong> Deleted</p>`}
+                        </div>
+                        <div class="data-actions">
+                            ${actionButtons}
+                        </div>
+                    </div>
+                    `;
+                });
+
+                listElement.innerHTML = usersHtml;
+                
+                listElement.querySelectorAll('.view-edit-btn').forEach(button => {
+                    button.addEventListener('click', () => viewUserDetails(button.getAttribute('data-user-id')));
+                });
+                listElement.querySelectorAll('[data-action="delete"]').forEach(button => {
+                    button.addEventListener('click', () => handleUserAction(button.getAttribute('data-user-id'), 'delete'));
+                });
+                listElement.querySelectorAll('[data-action="restore"]').forEach(button => {
+                    button.addEventListener('click', () => handleUserAction(button.getAttribute('data-user-id'), 'restore'));
+                });
+
+            } catch (error) {
+                console.error("Error displaying users:", error);
+                listElement.innerHTML = '<p style="text-align: center; color: #f44336;">⚠️ የተጠቃሚዎችን መረጃ ለመጫን አልተቻለም።</p>';
+            }
+        }
+
+        async function handleUserAction(userId, action) {
+            let newStatus = '';
+            let confirmMessage = '';
+
+            if (action === 'delete') {
+                confirmMessage = `በእርግጥ ተጠቃሚውን (${userId}) መሰረዝ (ወደ Trash መላክ) ይፈልጋሉ?`;
+                newStatus = 'deleted';
+            } else if (action === 'restore') {
+                confirmMessage = `በእርግጥ ተጠቃሚውን (${userId}) መመለስ (Activate) ይፈልጋሉ?`;
+                newStatus = 'active';
+            }
+
+            if (confirm(confirmMessage)) {
+                const success = await updateUserData(userId, { status: newStatus });
+                if (success) {
+                    alert(`✅ የተጠቃሚ (${userId}) ሁኔታ ወደ ${newStatus} ተቀይሯል።`);
+                    if (action === 'delete') {
+                        switchAdminPage('users');
+                    } else if (action === 'restore') {
+                        switchAdminPage('trash');
+                    }
+                } else {
+                    alert(`⚠️ የተጠቃሚውን ሁኔታ ለመቀየር አልተቻለም።`);
+                }
+            }
+        }
+
+        // ********** 8. USER DETAIL MODAL LOGIC **********
+
+        async function viewUserDetails(userId) {
+            modalMessage.textContent = 'Loading user data...';
+            modalMessage.classList.remove('success', 'error');
+
+            const user = await getUserData(userId);
+            if (!user) {
+                modalMessage.textContent = '⚠️ User not found!';
+                modalMessage.classList.add('error');
+                return;
+            }
+
+            // Populate the MODAL EDITABLE FIELDS
+            document.getElementById('modal-user-name').textContent = user.name;
+            document.getElementById('modal-user-id').value = userId; 
+            document.getElementById('modal-name').value = user.name || '';
+            document.getElementById('modal-identifier').value = user.identifier || '';
+            document.getElementById('modal-balance').value = user.balance !== undefined ? user.balance.toFixed(2) : '0.00';
+            
+            // Populate the MODAL READ-ONLY FIELDS
+            document.getElementById('modal-reg-date').value = user.registrationDate || 'N/A';
+            document.getElementById('modal-password-note').value = `Password is hashed/encrypted. 
+Referral Code: ${user.referralCode || 'N/A'}
+Referred By: ${user.referredBy || 'None'}`;
+            
+            // ********** Populate Transactions **********
+            const transactionsList = document.getElementById('modal-transactions-list');
+            let transactionsHtml = '';
+            const transactionsArray = Array.isArray(user.transactions) ? user.transactions : (user.transactions ? Object.values(user.transactions) : []);
+
+            if (transactionsArray.length > 0) {
+                transactionsArray.sort((a, b) => new Date(b.date) - new Date(a.date)); 
+                transactionsArray.forEach(tx => {
+                    const statusColor = tx.status === 'Completed' ? 'green' : (tx.status === 'Pending' ? 'orange' : 'red');
+                    transactionsHtml += `
+                        <p style="border-bottom: 1px dotted #eee; padding: 5px 0; margin: 0;">
+                            <span style="color: ${statusColor}; font-weight: bold;">[${tx.status}]</span> 
+                            ${tx.type} | ${tx.amount ? tx.amount.toFixed(2) : 'N/A'} ETB | Date: ${tx.date || 'N/A'}
+                        </p>
+                    `;
+                });
+            } else {
+                transactionsHtml = '<p style="margin: 0; color: #888;">No transactions found.</p>';
+            }
+            transactionsList.innerHTML = transactionsHtml;
+
+
+            // ********** Populate Investments **********
+            const investmentsList = document.getElementById('modal-investments-list');
+            let investmentsHtml = '';
+            const investmentsArray = Array.isArray(user.investments) ? user.investments : (user.investments ? Object.values(user.investments) : []);
+
+            if (investmentsArray.length > 0) {
+                investmentsArray.sort((a, b) => new Date(b.startDate) - new Date(a.startDate)); 
+                investmentsArray.forEach(inv => {
+                    const daysLeft = inv.daysLeft || 0;
+                    const isCompleted = daysLeft <= 0;
+                    const statusColor = isCompleted ? 'gray' : '#1abc9c';
+                    const daysDisplay = isCompleted ? `Completed` : `${daysLeft} days left`;
+                    const profitDisplay = inv.profitEarned ? inv.profitEarned.toFixed(2) : '0.00';
+                    
+                    investmentsHtml += `
+                        <p style="border-bottom: 1px dotted #eee; padding: 5px 0; margin: 0;">
+                            <span style="color: ${statusColor}; font-weight: bold;">[${daysDisplay}]</span> 
+                            ${inv.name} (${inv.amount ? inv.amount.toFixed(2) : 'N/A'} ETB) | Profit: ${profitDisplay} ETB
+                        </p>
+                    `;
+                });
+            } else {
+                investmentsHtml = '<p style="margin: 0; color: #888;">No investments found.</p>';
+            }
+            investmentsList.innerHTML = investmentsHtml;
+
+            
+            modalMessage.textContent = 'All available user data loaded.';
+            modalMessage.classList.add('success');
+            userDetailModal.style.display = 'block';
+        }
+
+        userEditForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const userId = document.getElementById('modal-user-id').value;
+            const updatedData = {
+                name: document.getElementById('modal-name').value,
+                balance: parseFloat(document.getElementById('modal-balance').value),
+            };
+            
+            modalMessage.textContent = '...Saving...';
+            modalMessage.classList.remove('error');
+
+            if (isNaN(updatedData.balance)) {
+                modalMessage.textContent = '⚠️ Balance must be a valid number!';
+                modalMessage.classList.add('error');
+                return;
+            }
+
+            const success = await updateUserData(userId, updatedData);
+
+            if (success) {
+                modalMessage.textContent = '✅ User data saved successfully!';
+                modalMessage.classList.add('success');
+                if (document.getElementById('content-users').classList.contains('active')) {
+                    displayAllUsers('active');
+                }
+            } else {
+                modalMessage.textContent = '⚠️ Failed to save user data!';
+                modalMessage.classList.add('error');
+            }
+        });
+
+        modalCloseBtn.onclick = function() {
+            userDetailModal.style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            if (event.target == userDetailModal) {
+                userDetailModal.style.display = 'none';
+            }
+        }
+        
+        // ********** 9. INVESTMENT MANAGEMENT **********
+
+        async function displayInvestments(isOnlyActive) {
+            const listElement = isOnlyActive ? activeInvestmentsList : allInvestmentsHistory;
+            listElement.innerHTML = '<p style="text-align: center; color: #555;">Loading...</p>';
+            try {
+                const allUsers = await getAllUsersData();
+                let invHtml = '';
+                const allInvestments = []; 
+
+                Object.keys(allUsers).forEach(userId => {
+                    const user = allUsers[userId];
+                    const investmentsArray = Array.isArray(user.investments) ? user.investments : (user.investments ? Object.values(user.investments) : []);
+                    
+                    investmentsArray.forEach(inv => {
+                        const daysLeft = inv.daysLeft || 0;
+                        const isCompleted = daysLeft <= 0;
+
+                        if (!isOnlyActive || !isCompleted) { 
+                            allInvestments.push({ ...inv, userName: user.name, userId: user.identifier });
+                        }
+                    });
+                });
+
+                allInvestments.sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+
+                allInvestments.forEach(inv => {
+                    let actionButton = '';
+                    const daysLeft = inv.daysLeft || 0;
+                    const isCompleted = daysLeft <= 0;
+                    const statusColor = isCompleted ? '#95a5a6' : '#1abc9c';
+                    const daysDisplay = isCompleted ? `0 / ${inv.daysTotal} ቀናት` : `${daysLeft} / ${inv.daysTotal} ቀናት`;
+                    const statusText = isCompleted ? 'Completed' : 'Active';
+                    const formattedAmount = inv.amount ? inv.amount.toFixed(2) : 'N/A';
+                    const formattedProfit = inv.profitEarned ? inv.profitEarned.toFixed(2) : '0.00';
+
+                    if (!isCompleted) {
+                        actionButton = `<button class="reject-btn" data-inv-id="${inv.id}" data-user-id="${inv.userId}" data-action="end">🛑 End Investment</button>`;
+                    } else {
+                        actionButton = `<span class="investment-ended" style="color: ${statusColor}; font-weight: bold;">${statusText}</span>`;
+                    }
+                    
+                    const detailButton = `<button class="approve-btn" style="background-color: #f39c12; margin-left: 0;" disabled>Total Profit: ${formattedProfit} ETB</button>`;
+
+                    invHtml += `
+                    <div class="data-item" style="border-left: 5px solid ${statusColor};">
+                        <div class="data-info">
+                            <p><strong>ዕቅድ:</strong> ${inv.name} | <strong>መጠን:</strong> ${formattedAmount} ETB</p>
+                            <p><strong>ተጠቃሚ:</strong> ${inv.userName} (${inv.userId})</p>
+                            <p><strong>ቀሪ ቀናት:</strong> <span style="font-weight: bold; color: ${statusColor};">${daysDisplay} (${statusText})</span></p>
+                            <p><strong>ጀምሯል:</strong> ${inv.startDate}</p>
+                        </div>
+                        <div class="data-actions">
+                            ${detailButton}
+                            ${actionButton}
+                        </div>
+                    </div>
+                    `;
+                });
+                
+                if (allInvestments.length === 0) {
+                    listElement.innerHTML = '<p style="text-align: center; color: #555;">ምንም ኢንቨስትመንት አልተመዘገበም።</p>';
+                } else {
+                    listElement.innerHTML = invHtml;
+
+                    listElement.querySelectorAll('.reject-btn[data-action="end"]').forEach(button => {
+                        button.addEventListener('click', function() {
+                            const invId = this.getAttribute('data-inv-id');
+                            const userId = this.getAttribute('data-user-id');
+                            handleAdminInvestmentAction(userId, invId, isOnlyActive);
+                        });
+                    });
+                }
+
+            } catch (error) {
+                console.error("Error displaying investments for admin:", error);
+                listElement.innerHTML = '<p style="text-align: center; color: #f44336;">⚠️ ኢንቨስትመንቶችን ለመጫን አልተቻለም።</p>';
+            }
+        }
+
+        async function handleAdminInvestmentAction(userId, invId, isOnlyActive) {
+            const user = await getUserData(userId);
+            if (!user) { alert("⚠️ ተጠቃሚው አልተገኘም።"); return; }
+
+            let investmentsArray = Array.isArray(user.investments) ? user.investments : (user.investments ? Object.values(user.investments) : []);
+            const invIndex = investmentsArray.findIndex(inv => inv.id === invId);
+
+            if (invIndex === -1) { alert("⚠️ ኢንቨስትመንቱ አልተገኘም።"); displayInvestments(isOnlyActive); return; }
+
+            const investment = investmentsArray[invIndex];
+            
+            const confirmEnd = confirm(`⚠️ የ ${investment.name} ኢንቨስትመንት ለተጠቃሚ ${user.name} (${userId}) ማጠናቀቅ ይፈልጋሉ?`);
+            if (confirmEnd) {
+                investment.daysLeft = 0;
+                investmentsArray[invIndex] = investment; 
+                
+                await updateUserData(userId, { investments: investmentsArray });
+                alert(`✅ የ ${investment.name} ኢንቨስትመንት በተሳካ ሁኔታ አብቅቷል።`);
+            } 
+
+            displayInvestments(isOnlyActive);
+        }
+
+        // ********** 10. EVENT HANDLERS & INITIALIZATION **********
+
+        // ***** Admin Login Handler *****
+        loginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const identifier = document.getElementById('login-identifier').value.trim();
+            const password = document.getElementById('login-password').value.trim();
+            loginMessage.textContent = '...Loading...';
+            loginMessage.classList.remove('error');
+
+            if (identifier === ADMIN_ID && password === ADMIN_PASS) {
+                isAdmin = true;
+                loginArea.style.display = 'none';
+                adminDashboardArea.style.display = 'flex'; 
+                switchAdminPage('deposits'); 
+            } else {
+                loginMessage.textContent = '⚠️ Admin ID ወይም Password ትክክል አይደለም።';
+                loginMessage.classList.add('error');
+            }
+        });
+
+        // Admin Navigation Handlers
+        allNavLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                const pageId = this.getAttribute('data-page');
+                if (pageId) {
+                    switchAdminPage(pageId);
+                }
+            });
+        });
+
+        // NEW: Search Input Handler for Users Page
+        if (userSearchInput) {
+             userSearchInput.addEventListener('input', () => {
+                // Check if the Users page is currently active before running the search
+                if (document.getElementById('content-users').classList.contains('active')) {
+                    const searchTerm = userSearchInput.value.trim();
+                    displayAllUsers('active', searchTerm);
+                }
+            });
+        }
+
+
+        // Admin Logout
+        adminLogoutBtn.addEventListener('click', function() {
+            logout();
+            alert('ከአስተዳደር ፓነሉ ወጥተዋል።');
+        });
+
+        function logout() {
+            isAdmin = false;
+            adminDashboardArea.style.display = 'none';
+            loginArea.style.display = 'flex';
+            document.getElementById('login-identifier').value = ADMIN_ID; 
+            document.getElementById('login-password').value = ADMIN_PASS; 
+            loginMessage.textContent = '';
+        }
+
+        // Initialization 
+        loginArea.style.display = 'flex';
+        adminDashboardArea.style.display = 'none';
+    </script>
+</body>
+</html>
